@@ -1,0 +1,18 @@
+{
+  "name": "documind-frontend",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "frontend": "vite",
+    "backend": "cd documind-backend && python -m uvicorn app.main:app --reload",
+    "dev": "concurrently \"npm run frontend\" \"npm run backend\"",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.1",
+    "typescript": "~6.0.2",
+    "vite": "^8.1.1"
+  }
+}
