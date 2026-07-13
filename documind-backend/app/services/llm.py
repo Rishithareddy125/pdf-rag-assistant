@@ -1,31 +1,18 @@
 """
-Generation via Claude (Anthropic API) — the OpenAI substitute for chat
-completion. This is where the brief's core safety requirement lives:
-the model must refuse rather than invent facts when the retrieved
+Generation via Google Gemini API. This is where the brief's core safety requirement
+lives: the model must refuse rather than invent facts when the retrieved
 context doesn't actually answer the question.
 
-We ask Claude for strict JSON so citations can be rendered as chips on
+We ask Gemini for strict JSON so citations can be rendered as chips on
 the frontend without any brittle regex-parsing of prose.
 """
 import json
 from typing import List, Optional
-
-import anthropic
+import requests
 
 from app.config import settings
 from app.services.vector_store import query as vector_query
 from app.services.embeddings import embed_query
-
-_client = None
-
-
-def _get_client() -> anthropic.Anthropic:
-    global _client
-    if not settings.anthropic_api_key:
-        raise RuntimeError("ANTHROPIC_API_KEY is not set. Add it to your .env file.")
-    if _client is None:
-        _client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
-    return _client
 
 
 SYSTEM_PROMPT = """You are DocuMind, an enterprise knowledge assistant.
@@ -69,54 +56,40 @@ def _build_context(matches) -> str:
     return "\n\n---\n\n".join(blocks)
 
 
-import requests
-
 def answer_question(question: str, top_k: int = 5, document_id: Optional[str] = None) -> dict:
     query_embedding = embed_query(question)
     matches = vector_query(query_embedding, top_k=top_k, document_id=document_id)
     context = _build_context(matches)
 
-    if settings.gemini_api_key:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{settings.gemini_model}:generateContent?key={settings.gemini_api_key}"
-        headers = {"Content-Type": "application/json"}
-        payload = {
-            "contents": [
-                {
-                    "parts": [
-                        {"text": f"CONTEXT:\n{context}\n\nQUESTION:\n{question}"}
-                    ]
-                }
-            ],
-            "systemInstruction": {
+    if not settings.gemini_api_key:
+        raise RuntimeError("GEMINI_API_KEY is not set. Add it to your .env file.")
+
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{settings.gemini_model}:generateContent?key={settings.gemini_api_key}"
+    headers = {"Content-Type": "application/json"}
+    payload = {
+        "contents": [
+            {
                 "parts": [
-                    {"text": SYSTEM_PROMPT}
+                    {"text": f"CONTEXT:\n{context}\n\nQUESTION:\n{question}"}
                 ]
-            },
-            "generationConfig": {
-                "responseMimeType": "application/json"
             }
+        ],
+        "systemInstruction": {
+            "parts": [
+                {"text": SYSTEM_PROMPT}
+            ]
+        },
+        "generationConfig": {
+            "responseMimeType": "application/json"
         }
-        try:
-            response = requests.post(url, headers=headers, json=payload)
-            response.raise_for_status()
-            res_json = response.json()
-            raw_text = res_json["candidates"][0]["content"]["parts"][0]["text"]
-        except Exception as e:
-            raw_text = "{}"
-    else:
-        client = _get_client()
-        response = client.messages.create(
-            model=settings.anthropic_model,
-            max_tokens=1000,
-            system=SYSTEM_PROMPT,
-            messages=[
-                {
-                    "role": "user",
-                    "content": f"CONTEXT:\n{context}\n\nQUESTION:\n{question}",
-                }
-            ],
-        )
-        raw_text = "".join(block.text for block in response.content if block.type == "text")
+    }
+    try:
+        response = requests.post(url, headers=headers, json=payload)
+        response.raise_for_status()
+        res_json = response.json()
+        raw_text = res_json["candidates"][0]["content"]["parts"][0]["text"]
+    except Exception as e:
+        raw_text = "{}"
 
     try:
         parsed = json.loads(raw_text)

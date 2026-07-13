@@ -8,14 +8,8 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 1440
 
-    anthropic_api_key: str = ""
-    anthropic_model: str = "claude-sonnet-4-6"
-
     gemini_api_key: str = ""
     gemini_model: str = "gemini-2.5-flash"
-
-    voyage_api_key: str = ""
-    voyage_model: str = "voyage-3"
 
     pinecone_api_key: str = ""
     pinecone_index_name: str = "documind-enterprise"
