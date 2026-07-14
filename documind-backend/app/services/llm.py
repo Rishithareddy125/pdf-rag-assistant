@@ -77,13 +77,13 @@ def answer_question(question: str, top_k: int = 5, document_id: Optional[str] = 
                 ]
             }
         ],
-        "system_instruction": {
+        "systemInstruction": {
             "parts": [
                 {"text": SYSTEM_PROMPT}
             ]
         },
-        "generation_config": {
-            "response_mime_type": "application/json"
+        "generationConfig": {
+            "responseMimeType": "application/json"
         }
     }
     try:
