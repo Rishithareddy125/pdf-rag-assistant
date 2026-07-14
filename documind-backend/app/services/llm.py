@@ -67,7 +67,7 @@ def answer_question(question: str, top_k: int = 5, document_id: Optional[str] = 
     if not settings.gemini_api_key:
         raise RuntimeError("GEMINI_API_KEY is not set. Add it to your .env file.")
 
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{settings.gemini_model}:generateContent?key={settings.gemini_api_key}"
+    url = f"https://generativelanguage.googleapis.com/v1/models/{settings.gemini_model}:generateContent?key={settings.gemini_api_key}"
     headers = {"Content-Type": "application/json"}
     payload = {
         "contents": [
