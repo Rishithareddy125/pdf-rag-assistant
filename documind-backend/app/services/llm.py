@@ -7,12 +7,15 @@ We ask Gemini for strict JSON so citations can be rendered as chips on
 the frontend without any brittle regex-parsing of prose.
 """
 import json
+import logging
 from typing import List, Optional
 import requests
 
 from app.config import settings
 from app.services.vector_store import query as vector_query
 from app.services.embeddings import embed_query
+
+logger = logging.getLogger(__name__)
 
 
 SYSTEM_PROMPT = """You are DocuMind, an enterprise knowledge assistant.
@@ -89,7 +92,8 @@ def answer_question(question: str, top_k: int = 5, document_id: Optional[str] = 
         res_json = response.json()
         raw_text = res_json["candidates"][0]["content"]["parts"][0]["text"]
     except Exception as e:
-        raw_text = "{}"
+        logger.error(f"Gemini LLM call failed: {e}", exc_info=True)
+        raw_text = '{"refused": true, "answer": "I wasn\'t able to verify an answer for this from the ingested documents.", "citations": []}'
 
     try:
         parsed = json.loads(raw_text)
@@ -104,4 +108,5 @@ def answer_question(question: str, top_k: int = 5, document_id: Optional[str] = 
 
     parsed.setdefault("citations", [])
     parsed.setdefault("refused", False)
+    parsed.setdefault("answer", "I wasn't able to verify an answer for this from the ingested documents.")
     return parsed
