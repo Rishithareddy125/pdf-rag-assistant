@@ -12,8 +12,13 @@ def post_with_retry(url: str, json: dict, timeout: int, max_retries: int = 5) ->
     for attempt in range(max_retries):
         response = requests.post(url, json=json, timeout=timeout)
         if response.status_code == 429:
+            try:
+                error_details = response.json()
+            except Exception:
+                error_details = response.text
             logger.warning(
-                f"Gemini API rate limit hit (429). Retrying in {delay} seconds (attempt {attempt + 1}/{max_retries})..."
+                f"Gemini API rate limit hit (429). Details: {error_details}. "
+                f"Retrying in {delay} seconds (attempt {attempt + 1}/{max_retries})..."
             )
             time.sleep(delay)
             delay *= 2  # Exponential backoff
