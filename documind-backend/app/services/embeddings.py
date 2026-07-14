@@ -55,11 +55,13 @@ def embed_documents(texts: List[str]) -> List[List[float]]:
 
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:batchEmbedContents?key={settings.gemini_api_key}"
 
-    # Batch requests in chunks of 50 to avoid payload size limit
-    batch_size = 50
+    # Batch requests in chunks of 100 to avoid payload size limit and rate limits
+    batch_size = 100
     all_embeddings = []
 
     for i in range(0, len(texts), batch_size):
+        if i > 0:
+            time.sleep(0.5)  # Small proactive sleep between batches to respect rate limits
         chunk_texts = texts[i:i + batch_size]
         payload = {
             "requests": [

@@ -68,12 +68,18 @@ def upsert_chunks(document_id: str, filename: str, chunks, embeddings: List[List
 
 
 def query(embedding: List[float], top_k: int = 5, document_id: Optional[str] = None):
-    index = get_index()
-    if document_id:
-        result = index.query(vector=embedding, filter={"document_id": document_id}, top_k=top_k, include_metadata=True)
-    else:
-        result = index.query(vector=embedding, top_k=top_k, include_metadata=True)
-    return result.get("matches", [])
+    try:
+        index = get_index()
+        if document_id:
+            result = index.query(vector=embedding, filter={"document_id": document_id}, top_k=top_k, include_metadata=True)
+        else:
+            result = index.query(vector=embedding, top_k=top_k, include_metadata=True)
+        return result.get("matches", [])
+    except Exception as e:
+        if "Namespace not found" in str(e):
+            logger.info("Pinecone namespace not found when querying (index might be empty). Returning empty results.")
+            return []
+        raise
 
 
 def delete_document(document_id: str):
@@ -82,4 +88,7 @@ def delete_document(document_id: str):
         index.delete(filter={"document_id": {"$eq": document_id}})
     except Exception as e:
         # If the namespace/document is not found or already deleted, do not crash the delete flow
-        logger.warning(f"Failed to delete document {document_id} from Pinecone: {e}")
+        if "Namespace not found" in str(e):
+            logger.info(f"Pinecone namespace not found when deleting document {document_id} (nothing to delete).")
+        else:
+            logger.warning(f"Failed to delete document {document_id} from Pinecone: {e}")

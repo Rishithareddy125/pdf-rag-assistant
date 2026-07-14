@@ -2,18 +2,50 @@ import os
 import uuid
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, BackgroundTasks
 from sqlalchemy.orm import Session
 
 from app.auth import get_current_user
 from app.config import settings
-from app.database import get_db
+from app.database import get_db, SessionLocal
 from app.models import User, Document
 from app.schemas import DocumentOut
 from app.services import pdf_processing, embeddings, vector_store
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/documents", tags=["documents"])
+
+
+def process_pdf_background(document_id: str, stored_path: str, filename: str):
+    db = SessionLocal()
+    try:
+        chunks = pdf_processing.process_pdf(stored_path)
+        
+        document = db.query(Document).filter(Document.id == document_id).first()
+        if not document:
+            logger.error(f"Document {document_id} not found in database during background ingestion.")
+            return
+
+        document.page_count = pdf_processing.page_count(stored_path)
+
+        if chunks:
+            vectors = embeddings.embed_documents([c.text for c in chunks])
+            vector_store.upsert_chunks(document.id, filename, chunks, vectors)
+
+        document.status = "ready"
+        db.commit()
+    except Exception as e:
+        logger.error(f"Error processing document {document_id} in background: {e}", exc_info=True)
+        try:
+            db.rollback()
+            document = db.query(Document).filter(Document.id == document_id).first()
+            if document:
+                document.status = "failed"
+                db.commit()
+        except Exception as db_err:
+            logger.error(f"Failed to update document status to failed: {db_err}", exc_info=True)
+    finally:
+        db.close()
 
 
 @router.get("", response_model=list[DocumentOut])
@@ -23,6 +55,7 @@ def list_documents(db: Session = Depends(get_db), user: User = Depends(get_curre
 
 @router.post("/upload", response_model=DocumentOut)
 def upload_document(
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
@@ -46,22 +79,12 @@ def upload_document(
     db.commit()
     db.refresh(document)
 
-    try:
-        chunks = pdf_processing.process_pdf(stored_path)
-        document.page_count = pdf_processing.page_count(stored_path)
-
-        if chunks:
-            vectors = embeddings.embed_documents([c.text for c in chunks])
-            vector_store.upsert_chunks(document.id, file.filename, chunks, vectors)
-
-        document.status = "ready"
-    except Exception as e:
-        document.status = "failed"
-        logger.error(f"Error processing document: {e}", exc_info=True)
-        raise
-    finally:
-        db.commit()
-        db.refresh(document)
+    background_tasks.add_task(
+        process_pdf_background,
+        document.id,
+        stored_path,
+        file.filename
+    )
 
     return document
 
