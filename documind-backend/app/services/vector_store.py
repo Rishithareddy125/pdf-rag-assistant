@@ -5,11 +5,14 @@ Each vector's metadata carries {document_id, filename, page, text} so a
 retrieval hit can be turned straight into a citation chip on the frontend
 without a second database lookup.
 """
+import logging
 from typing import List, Optional
 
 from pinecone import Pinecone, ServerlessSpec
 
 from app.config import settings
+
+logger = logging.getLogger(__name__)
 
 EMBEDDING_DIMENSION = 384
 
@@ -74,5 +77,9 @@ def query(embedding: List[float], top_k: int = 5, document_id: Optional[str] = N
 
 
 def delete_document(document_id: str):
-    index = get_index()
-    index.delete(filter={"document_id": {"$eq": document_id}})
+    try:
+        index = get_index()
+        index.delete(filter={"document_id": {"$eq": document_id}})
+    except Exception as e:
+        # If the namespace/document is not found or already deleted, do not crash the delete flow
+        logger.warning(f"Failed to delete document {document_id} from Pinecone: {e}")
