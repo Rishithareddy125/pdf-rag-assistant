@@ -69,19 +69,21 @@ def answer_question(question: str, top_k: int = 5, document_id: Optional[str] = 
 
     url = f"https://generativelanguage.googleapis.com/v1/models/{settings.gemini_model}:generateContent?key={settings.gemini_api_key}"
     headers = {"Content-Type": "application/json"}
+    # Put the system instructions directly into the prompt text to avoid API compatibility issues
+    # with the systemInstruction / generationConfig parameters on different API versions.
+    full_prompt = (
+        f"{SYSTEM_PROMPT}\n\n"
+        f"CONTEXT:\n{context}\n\n"
+        f"QUESTION:\n{question}"
+    )
     payload = {
         "contents": [
             {
                 "parts": [
-                    {"text": f"CONTEXT:\n{context}\n\nQUESTION:\n{question}"}
+                    {"text": full_prompt}
                 ]
             }
-        ],
-        "systemInstruction": {
-            "parts": [
-                {"text": SYSTEM_PROMPT}
-            ]
-        }
+        ]
     }
     try:
         response = requests.post(url, headers=headers, json=payload)
