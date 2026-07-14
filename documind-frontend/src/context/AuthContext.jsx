@@ -18,6 +18,7 @@ export function AuthProvider({ children }) {
       .then(setUser)
       .catch(() => {
         setToken(null)
+        setUser(null)
         localStorage.removeItem('documind_token')
       })
       .finally(() => setLoading(false))
