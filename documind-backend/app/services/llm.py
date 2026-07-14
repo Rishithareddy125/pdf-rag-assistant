@@ -88,6 +88,8 @@ def answer_question(question: str, top_k: int = 5, document_id: Optional[str] = 
     }
     try:
         response = requests.post(url, headers=headers, json=payload)
+        if response.status_code != 200:
+            logger.error(f"Gemini LLM call failed with status {response.status_code}. Response: {response.text}")
         response.raise_for_status()
         res_json = response.json()
         raw_text = res_json["candidates"][0]["content"]["parts"][0]["text"]
