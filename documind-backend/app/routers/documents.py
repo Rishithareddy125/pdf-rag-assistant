@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from app.auth import get_current_user
 from app.config import settings
 from app.database import get_db, SessionLocal
-from app.models import User, Document
+from app.models import User, Document, Chat
 from app.schemas import DocumentOut
 from app.services import pdf_processing, embeddings, vector_store
 
@@ -98,6 +98,10 @@ def delete_document(
     document = db.query(Document).filter(Document.id == document_id, Document.uploaded_by == user.id).first()
     if not document:
         raise HTTPException(status_code=404, detail="Document not found or access denied.")
+
+    # Nullify document_id on all chats referencing this document to prevent ForeignKey constraint violations
+    db.query(Chat).filter(Chat.document_id == document_id).update({Chat.document_id: None})
+    db.commit()
 
     vector_store.delete_document(document_id)
     db.delete(document)
