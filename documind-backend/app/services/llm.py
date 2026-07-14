@@ -81,9 +81,6 @@ def answer_question(question: str, top_k: int = 5, document_id: Optional[str] = 
             "parts": [
                 {"text": SYSTEM_PROMPT}
             ]
-        },
-        "generationConfig": {
-            "responseMimeType": "application/json"
         }
     }
     try:
@@ -97,8 +94,20 @@ def answer_question(question: str, top_k: int = 5, document_id: Optional[str] = 
         logger.error(f"Gemini LLM call failed: {e}", exc_info=True)
         raw_text = '{"refused": true, "answer": "I wasn\'t able to verify an answer for this from the ingested documents.", "citations": []}'
 
+    # Helper to strip markdown code fences if Gemini returns them
+    def clean_json_text(text: str) -> str:
+        text = text.strip()
+        if text.startswith("```"):
+            lines = text.splitlines()
+            if lines[0].startswith("```"):
+                lines = lines[1:]
+            if lines and lines[-1].startswith("```"):
+                lines = lines[:-1]
+            text = "\n".join(lines).strip()
+        return text
+
     try:
-        parsed = json.loads(raw_text)
+        parsed = json.loads(clean_json_text(raw_text))
     except (json.JSONDecodeError, TypeError):
         # Model didn't return clean JSON — fail safe into a refusal rather
         # than showing the user a broken or unverifiable answer.
