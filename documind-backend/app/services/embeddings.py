@@ -1,9 +1,26 @@
 import logging
 import requests
+import time
 from typing import List
 from app.config import settings
 
 logger = logging.getLogger(__name__)
+
+
+def post_with_retry(url: str, json: dict, timeout: int, max_retries: int = 5) -> requests.Response:
+    delay = 1.0
+    for attempt in range(max_retries):
+        response = requests.post(url, json=json, timeout=timeout)
+        if response.status_code == 429:
+            logger.warning(
+                f"Gemini API rate limit hit (429). Retrying in {delay} seconds (attempt {attempt + 1}/{max_retries})..."
+            )
+            time.sleep(delay)
+            delay *= 2  # Exponential backoff
+            continue
+        return response
+    # Return the last response to let it raise_for_status
+    return response
 
 
 def get_embedding(text: str) -> List[float]:
@@ -19,7 +36,7 @@ def get_embedding(text: str) -> List[float]:
         "outputDimensionality": 384
     }
 
-    response = requests.post(url, json=payload, timeout=15)
+    response = post_with_retry(url, json=payload, timeout=15)
     response.raise_for_status()
     data = response.json()
     return data["embedding"]["values"]
@@ -57,7 +74,7 @@ def embed_documents(texts: List[str]) -> List[List[float]]:
             ]
         }
 
-        response = requests.post(url, json=payload, timeout=30)
+        response = post_with_retry(url, json=payload, timeout=30)
         response.raise_for_status()
         data = response.json()
 
