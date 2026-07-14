@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 1440
 
     gemini_api_key: str = ""
-    gemini_model: str = "gemini-1.5-flash"
+    gemini_model: str = "gemini-2.5-flash"
 
     pinecone_api_key: str = ""
     pinecone_index_name: str = "documind-enterprise"
