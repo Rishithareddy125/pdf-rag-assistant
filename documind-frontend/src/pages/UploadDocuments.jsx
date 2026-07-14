@@ -15,9 +15,13 @@ export default function UploadDocuments() {
     api.listDocuments(token).then(setDocs).catch(() => setDocs([]))
   }, [token])
 
+  // Initial load
   useEffect(() => {
     refresh()
-    // Poll for document status updates every 4 seconds if any document is processing
+  }, [refresh])
+
+  // Poll for document status updates every 4 seconds if any document is processing
+  useEffect(() => {
     const hasProcessing = docs.some(d => d.status === 'processing')
     if (hasProcessing) {
       const interval = setInterval(refresh, 4000)
