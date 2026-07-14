@@ -1,5 +1,6 @@
 import os
 import uuid
+import logging
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
@@ -11,6 +12,7 @@ from app.models import User, Document
 from app.schemas import DocumentOut
 from app.services import pdf_processing, embeddings, vector_store
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/documents", tags=["documents"])
 
 
@@ -53,8 +55,9 @@ def upload_document(
             vector_store.upsert_chunks(document.id, file.filename, chunks, vectors)
 
         document.status = "ready"
-    except Exception:
+    except Exception as e:
         document.status = "failed"
+        logger.error(f"Error processing document: {e}", exc_info=True)
         raise
     finally:
         db.commit()
