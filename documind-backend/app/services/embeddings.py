@@ -70,9 +70,9 @@ def embed_documents(texts: List[str]) -> List[List[float]]:
 
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-2:batchEmbedContents?key={settings.gemini_api_key}"
 
-    # Batch requests in chunks of 30 to stay under the 100 RPM free tier limit
-    # (Each sub-request inside batchEmbedContents counts as 1 request towards the limit)
-    batch_size = 30
+    # Batch requests in chunks of 20 to stay under the 100 RPM free tier limit
+    # (20 requests every 15 seconds = 80 RPM, which is safely below 100 RPM)
+    batch_size = 20
     all_embeddings = []
 
     for i in range(0, len(texts), batch_size):
