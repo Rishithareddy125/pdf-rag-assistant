@@ -16,36 +16,45 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/documents", tags=["documents"])
 
 
-def process_pdf_background(document_id: str, stored_path: str, filename: str):
+def _update_document_status(document_id: str, status: str, page_count: int = None):
     db = SessionLocal()
     try:
-        chunks = pdf_processing.process_pdf(stored_path)
-        
         document = db.query(Document).filter(Document.id == document_id).first()
-        if not document:
-            logger.error(f"Document {document_id} not found in database during background ingestion.")
-            return
-
-        document.page_count = pdf_processing.page_count(stored_path)
-
-        if chunks:
-            vectors = embeddings.embed_documents([c.text for c in chunks])
-            vector_store.upsert_chunks(document.id, filename, chunks, vectors)
-
-        document.status = "ready"
-        db.commit()
+        if document:
+            document.status = status
+            if page_count is not None:
+                document.page_count = page_count
+            db.commit()
     except Exception as e:
-        logger.error(f"Error processing document {document_id} in background: {e}", exc_info=True)
-        try:
-            db.rollback()
-            document = db.query(Document).filter(Document.id == document_id).first()
-            if document:
-                document.status = "failed"
-                db.commit()
-        except Exception as db_err:
-            logger.error(f"Failed to update document status to failed: {db_err}", exc_info=True)
+        logger.error(f"Failed to update document status to {status}: {e}", exc_info=True)
+        db.rollback()
     finally:
         db.close()
+
+
+def process_pdf_background(document_id: str, stored_path: str, filename: str):
+    # 1. Parse the PDF (takes a few seconds)
+    try:
+        chunks = pdf_processing.process_pdf(stored_path)
+        page_count = pdf_processing.page_count(stored_path)
+    except Exception as e:
+        logger.error(f"Error parsing PDF {document_id}: {e}", exc_info=True)
+        _update_document_status(document_id, "failed")
+        return
+
+    # 2. Call the embedding API (takes time due to rate-limit pacing sleeps)
+    # Note: We close the database session here to prevent idle timeouts while waiting for API responses.
+    try:
+        if chunks:
+            vectors = embeddings.embed_documents([c.text for c in chunks])
+            vector_store.upsert_chunks(document_id, filename, chunks, vectors)
+    except Exception as e:
+        logger.error(f"Error embedding/upserting document {document_id}: {e}", exc_info=True)
+        _update_document_status(document_id, "failed")
+        return
+
+    # 3. Finalize the document status in the database
+    _update_document_status(document_id, "ready", page_count=page_count)
 
 
 @router.get("", response_model=list[DocumentOut])
