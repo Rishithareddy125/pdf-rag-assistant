@@ -42,9 +42,9 @@ def get_embedding(text: str) -> List[float]:
     if not settings.gemini_api_key:
         raise RuntimeError("GEMINI_API_KEY is not set. Add it to your environment variables.")
 
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key={settings.gemini_api_key}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-2:embedContent?key={settings.gemini_api_key}"
     payload = {
-        "model": "models/gemini-embedding-001",
+        "model": "models/gemini-embedding-2",
         "content": {
             "parts": [{"text": text}]
         },
@@ -68,7 +68,7 @@ def embed_documents(texts: List[str]) -> List[List[float]]:
     if not settings.gemini_api_key:
         raise RuntimeError("GEMINI_API_KEY is not set. Add it to your environment variables.")
 
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:batchEmbedContents?key={settings.gemini_api_key}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-2:batchEmbedContents?key={settings.gemini_api_key}"
 
     # Batch requests in chunks of 30 to stay under the 100 RPM free tier limit
     # (Each sub-request inside batchEmbedContents counts as 1 request towards the limit)
@@ -82,7 +82,7 @@ def embed_documents(texts: List[str]) -> List[List[float]]:
         payload = {
             "requests": [
                 {
-                    "model": "models/gemini-embedding-001",
+                    "model": "models/gemini-embedding-2",
                     "content": {
                         "parts": [{"text": t}]
                     },
